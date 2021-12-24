@@ -1,4 +1,5 @@
 import pygame
+import time
 
 
 class Spot:
@@ -35,6 +36,7 @@ class Main:
         self.black = (0, 0, 0)
         self.white = (255, 255, 255)
         self.red = (255, 0, 0)
+        self.green = (0, 255, 0)
         self.gold = (255, 215, 0)
         self.spots = []
         self.target = None
@@ -70,6 +72,26 @@ class Main:
                         self.starting_spot = s
         pygame.display.update()
 
+    def draw_to_target(self, col, row):
+        for spot in self.spots:
+            if col > 0:
+                for col_loop in range(col):
+                    if spot.col == self.starting_spot.col + col_loop + 1 and spot.row == self.starting_spot.row:
+                        spot.draw(self.green)
+            else:
+                for col_loop in range(col-1, -1):
+                    if spot.col == self.starting_spot.col + col_loop + 1 and spot.row == self.starting_spot.row:
+                        spot.draw(self.green)
+            if row > 0:
+                for row_loop in range(row):
+                    if spot.row == self.starting_spot.row + row_loop and spot.col == self.target.col:
+                        spot.draw(self.green)
+            else:
+                for row_loop in range(row, -1):
+                    if spot.row == self.starting_spot.row + row_loop + 1 and spot.col == self.target.col:
+                        spot.draw(self.green)
+        pygame.display.update()
+
     def game(self):
         running = True
         self.draw_squares()
@@ -84,14 +106,11 @@ class Main:
                     self.starting_spot = None
                     if event.y == -1 and self.square_size > 5:
                         self.square_size -= 1
-                        # print(self.square_size)
                         self.draw_squares()
                     if event.y == 1 and self.square_size < 100:
                         self.square_size += 1
-                        # print(self.square_size)
                         self.draw_squares()
                 elif event.type == pygame.MOUSEBUTTONDOWN:
-                    # print(event)
                     if event.button == 1:
                         if self.starting_spot is None:
                             self.draw_starting_spot(event.pos[0] // self.square_size, event.pos[1] // self.square_size)
@@ -99,13 +118,27 @@ class Main:
                         if self.target is None:
                             self.draw_target(event.pos[0] // self.square_size, event.pos[1] // self.square_size)
                     elif event.button == 3:
-                        if self.target is not None:
-                            self.target.draw(self.black)
-                            self.target = None
-                        if self.starting_spot is not None:
-                            self.starting_spot.draw(self.black)
-                            self.starting_spot = None
+                        self.draw_squares()
+                        self.target = None
+                        self.starting_spot = None
                         pygame.display.update()
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        if self.target is not None and self.starting_spot is not None:
+                            x = calDistance(self.target, self.starting_spot)
+                            self.draw_to_target(x[0], x[1])
+
+
+def calDistance(spot1, spot2):
+    spot1_x = spot1.col
+    spot1_y = spot1.row
+    spot2_x = spot2.col
+    spot2_y = spot2.row
+
+    x_distance = spot1_x - spot2_x
+    y_distance = spot1_y - spot2_y
+
+    return x_distance, y_distance
 
 
 start_game = Main()
