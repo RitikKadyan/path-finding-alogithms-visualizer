@@ -165,7 +165,7 @@ class Main:
                             x = calDistance(self.target, self.starting_spot)
                             self.draw_to_target(x[0], x[1])
                     if event.key == pygame.K_a:
-                        a_star(self.starting_spot, self.target)
+                        path_finding(self.starting_spot, self.target)
                     if event.key == pygame.K_b:
                         pos = pygame.mouse.get_pos()
                         self.draw_barrier(pos[0] // self.square_size, pos[1] // self.square_size)
@@ -173,89 +173,80 @@ class Main:
                         pygame.display.update()
 
 
-def backtrack(spot_to_consider, path, start, closed):
+def backtrack(spot_to_consider, path, start):
     spot_found = False
-    dark_brown = (25, 19, 7)
-    spot_to_consider.draw(dark_brown)
+    spot_to_consider.draw((252, 3, 215))
     while not spot_found:
         for neighbor in spot_to_consider.neighbors:
-            if neighbor not in closed and neighbor != start and not neighbor.barrier:
-                #spot_to_consider.draw(dark_brown)
-                neighbor.draw(dark_brown)
+            if neighbor not in path and neighbor != start and not neighbor.barrier:
+                neighbor.draw(neighbor.white)
+                path.append(neighbor)
                 return neighbor
-        #spot_to_consider.draw(dark_brown)
-        spot_to_ret = path[len(path) - 1]
-        #spot_to_ret.draw(dark_brown)
-        pygame.display.update()
-        closed.append(spot_to_ret)
-        path.remove(path[len(path) - 1])
-        backtrack(spot_to_ret, path, start, closed)
+        return backtrack(path[path.index(spot_to_consider) - 1], path, start)
 
 
 # Find the best spot closest to target spot
-def consider_spot(spot_to_consider, target, path, start, closed):
+def consider_spot(spot_to_consider, target, path, start):
     path.append(spot_to_consider)
     best_spot = None
     best_spot_f_cost = None
-    dark_brown = (25, 19, 7)
 
     # Goes through all the spot(spot_to_consider)'s neighbors
     for neighbor in spot_to_consider.neighbors:
         if neighbor == target:  # If the neighbor spot is the target spot return target to end while loop and print target reached
             print("Target reached!")
             pygame.display.update()
-            return target, path, closed
-        if neighbor not in closed and not neighbor.barrier and neighbor not in path and neighbor != start:
-            curr_h_cost = abs(neighbor.row - target.row) + abs(neighbor.col - target.col)
-            curr_g_cost = None
-            if neighbor.col == spot_to_consider.col:
-                if neighbor.row == spot_to_consider.row + 1 or neighbor.row == spot_to_consider.row - 1:
-                    curr_g_cost = 1
-            elif neighbor.row == spot_to_consider.row:
-                if neighbor.col == spot_to_consider.col + 1 or neighbor.col == spot_to_consider.col - 1:
-                    curr_g_cost = 1
-            else:
-                curr_g_cost = 1.5  # Do not change
-            curr_f_cost = curr_h_cost + curr_g_cost
-            if best_spot_f_cost is None:
-                best_spot_f_cost = curr_f_cost
+            return target, path
+        if not neighbor.barrier and neighbor not in path and neighbor != start:
+            curr_f_cost = abs(neighbor.row - target.row) + abs(neighbor.col - target.col)
+            if best_spot_f_cost is None or curr_f_cost < best_spot_f_cost:
                 best_spot = neighbor
-            elif curr_f_cost < best_spot_f_cost:
                 best_spot_f_cost = curr_f_cost
-                best_spot = neighbor
 
     if best_spot is None:
-        """
-        closed.append(spot_to_consider)
-        spot_to_consider.draw(dark_brown)
-        print(spot_to_consider.col, spot_to_consider.row, path[len(path)-1].col, path[len(path)-1].row)
-        spot_to_ret = path[len(path)-1]
-        path.remove(path[len(path)-1])
-        return spot_to_ret, path, closed
-        """
-        return backtrack(spot_to_consider, path, start, closed), path, closed
-
-    if best_spot in path:
-        spot_to_consider.draw(dark_brown)
-        closed.append(spot_to_consider)
-        if best_spot != start:
-            spot_to_consider.draw(dark_brown)
-            closed.append(best_spot)
+        return backtrack(spot_to_consider, path, start), path
     else:
         best_spot.draw(best_spot.white)
         path.append(best_spot)
-    return best_spot, path, closed
+        return best_spot, path
 
 
-# Runs the A* path finding algorithm
-def a_star(start, end):
-    path = []
-    closed = []
-    spot, path, closed = consider_spot(start, end, path, start, closed)
-    while spot != end:
-        #time.sleep(.1)
-        spot, path, closed = consider_spot(spot, end, path, start, closed)
+def draw_best_path(path, start):
+    path.reverse()
+    path_color = (56, 228, 174)
+
+    i = 0
+    while i < len(path) - 1:
+        path[i].draw(path_color)
         pygame.display.update()
+        path.remove(path[i])
+
+        if path[i] == start:
+            break
+
+        best_spot = None
+        best_spot_f_cost = None
+        for neighbor in path[i].neighbors:
+            if neighbor in path:
+                curr_f_cost = abs(neighbor.row - start.row) + abs(neighbor.col - start.col)
+                if best_spot is None or curr_f_cost < best_spot_f_cost:
+                    best_spot = neighbor
+                    best_spot_f_cost = curr_f_cost
+
+        if best_spot is None:
+            i += 1
+        else:
+            i = path.index(best_spot)
+
+
+def path_finding(start, end):
+    path = []
+    spot, path = consider_spot(start, end, path, start)
+    while spot != end:
+        # time.sleep(.1)
+        spot, path = consider_spot(spot, end, path, start)
+        pygame.display.update()
+    draw_best_path(path, start)
 
 
 def calDistance(spot1, spot2):
