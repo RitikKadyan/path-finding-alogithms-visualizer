@@ -96,10 +96,9 @@ python -m benchmarks.runner --rows 100 --cols 100 --density 0.3 --runs 10
 Below are example frames captured while running each algorithm on a 50×50
 grid with random barriers. (Images are stored in the `images/` directory.)
 
-| A\*                          | Dijkstra                                           | BFS | Bidirectional BFS |
-| ---------------------------- | -------------------------------------------------- | --- | ----------------- |
-| ![A-star](images/A-star.png) | ![Dijkstra](images/Dijkstra.png)                   |
-| ![BFS](images/BFS.png)       | ![Bidirectional BFS](images/Bidirectional_BFS.png) |
+| A\*                          | Dijkstra                         | BFS                    | Bidirectional BFS                                  |
+| ---------------------------- | -------------------------------- | ---------------------- | -------------------------------------------------- |
+| ![A-star](images/A-star.png) | ![Dijkstra](images/Dijkstra.png) | ![BFS](images/BFS.png) | ![Bidirectional BFS](images/Bidirectional_BFS.png) |
 
 ### Benchmarking
 
