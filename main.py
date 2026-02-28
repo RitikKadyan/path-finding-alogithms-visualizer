@@ -1,5 +1,10 @@
 import pygame
 import time
+from algorithms.astar import AStar
+from algorithms.dijkstra import Dijkstra
+from algorithms.bfs import BFS
+from algorithms.bidirectional import BidirectionalBFS
+from core.heuristics import manhattan
 
 
 class Spot:
@@ -15,7 +20,6 @@ class Spot:
         self.neighbors = []
         self.barrier = False
 
-    # Draws the spot and fills with color from color param. The default color is black.
     def draw(self, color):
         pygame.draw.rect(self.screen, color, pygame.Rect(self.col * self.square_size - self.square_size,
                                                          self.row * self.square_size - self.square_size,
@@ -27,15 +31,13 @@ class Spot:
             self.col * self.square_size - self.square_size, self.row * self.square_size - self.square_size),
                          (self.col * self.square_size, self.row * self.square_size - self.square_size))
 
-        pygame.display.update()
-
 
 class Main:
-
     def __init__(self):
+        pygame.init()  # Initialize pygame first
         self.width = 800
         self.height = 800
-        self.square_size = 50  # Max is the width size
+        self.square_size = 50
         self.rows = int(self.height / self.square_size)
         self.columns = int(self.width / self.square_size)
         self.black = (0, 0, 0)
@@ -50,8 +52,10 @@ class Main:
         self.backgroundColor = self.black
         self.screen = pygame.display.set_mode((self.width, self.height))
         self.screen.fill(self.backgroundColor)
-        self.game()
+        self.font = pygame.font.SysFont('arial', 20)  # Font for help text
+        self.keys_pressed = set()  # Track currently pressed keys
         self.draw_squares()
+        self.game()
 
     def assign_neighbors(self):
         for spot in self.spots:
@@ -64,9 +68,13 @@ class Main:
                         spot.neighbors.append(spot2)
 
     def draw_squares(self):
+        # Recalculate grid dimensions based on current square size
+        self.rows = int(self.height / self.square_size)
+        self.columns = int(self.width / self.square_size)
+        
         self.spots = []
-        for row in range(1, self.rows + round(self.height // self.square_size)):
-            for col in range(1, self.columns + round(self.width // self.square_size)):
+        for row in range(1, self.rows + 1):
+            for col in range(1, self.columns + 1):
                 self.spots.append(Spot(row, col, self.screen, self.square_size))
         self.assign_neighbors()
         pygame.display.update()
@@ -87,7 +95,6 @@ class Main:
                     if y < s.row < y + 2:
                         s.draw(self.gold)
                         self.starting_spot = s
-                        # self.draw_neighbors(s)
         pygame.display.update()
 
     def draw_barrier(self, x, y):
@@ -97,34 +104,43 @@ class Main:
                     if y < s.row < y + 2:
                         s.draw(self.gray)
                         s.barrier = True
-                        # self.draw_neighbors(s)
         pygame.display.update()
 
-    def draw_to_target(self, col, row):
+    def draw_path(self, path):
+        for coord in path:
+            row, col = coord
+            for spot in self.spots:
+                if spot.row == row and spot.col == col:
+                    spot.draw(self.green)
+        pygame.display.update()
+
+    def draw_help_text(self):
+        """Draw help text on the screen with background"""
+        help_text = [
+            "LEFT: Set Start | MID: Set Target | RIGHT: Clear Path | R: Reset",
+            "A: A* | D: Dijkstra | F: BFS | I: Bidirectional | B: Draw Barrier | SCROLL: Zoom"
+        ]
+        # Draw semi-transparent background
+        help_bg = pygame.Surface((self.width, 60))
+        help_bg.set_alpha(200)
+        help_bg.fill((40, 40, 40))
+        self.screen.blit(help_bg, (0, self.height - 60))
+        
+        # Draw text in white
+        y = self.height - 55
+        for line in help_text:
+            text_surf = self.font.render(line, True, (255, 255, 255))
+            self.screen.blit(text_surf, (10, y))
+            y += 25
+
+    def clear_path(self):
+        # Clear path only (green cells), keep start/target/barriers
         for spot in self.spots:
-            if col > 0:
-                for col_loop in range(col):
-                    if spot.col == self.starting_spot.col + col_loop + 1 and spot.row == self.starting_spot.row:
-                        spot.draw(self.green)
-            else:
-                for col_loop in range(col - 1, -1):
-                    if spot.col == self.starting_spot.col + col_loop + 1 and spot.row == self.starting_spot.row:
-                        spot.draw(self.green)
-            if row > 0:
-                for row_loop in range(row):
-                    if spot.row == self.starting_spot.row + row_loop and spot.col == self.target.col:
-                        spot.draw(self.green)
-            else:
-                for row_loop in range(row, -1):
-                    if spot.row == self.starting_spot.row + row_loop + 1 and spot.col == self.target.col:
-                        spot.draw(self.green)
+            # Only redraw if it's not start, target, or barrier
+            if spot != self.starting_spot and spot != self.target and not spot.barrier:
+                spot.draw(self.black)
         pygame.display.update()
 
-    @staticmethod
-    def draw_neighbors(spot):
-        for neighbor in spot.neighbors:
-            neighbor.draw(neighbor.red)
-        pygame.display.update()
 
     def game(self):
         running = True
@@ -152,113 +168,104 @@ class Main:
                         if self.target is None:
                             self.draw_target(event.pos[0] // self.square_size, event.pos[1] // self.square_size)
                     elif event.button == 3:
-                        self.draw_squares()
-                        self.target = None
-                        self.starting_spot = None
-                        pygame.display.update()
+                        # Right click: clear only the path, keep start/target/barriers
+                        self.clear_path()
                 elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_SPACE:
-                        if self.target is not None and self.starting_spot is not None:
-                            self.draw_squares()
-                            self.target.draw(self.red)
-                            self.starting_spot.draw(self.gold)
-                            x = calDistance(self.target, self.starting_spot)
-                            self.draw_to_target(x[0], x[1])
-                    if event.key == pygame.K_a:
-                        path_finding(self.starting_spot, self.target)
-                    if event.key == pygame.K_b:
-                        pos = pygame.mouse.get_pos()
-                        self.draw_barrier(pos[0] // self.square_size, pos[1] // self.square_size)
+                    self.keys_pressed.add(event.key)
                     if event.key == pygame.K_r:
-                        pygame.display.update()
+                        # Reset: clear only path and barriers, keep start/target
+                        for spot in self.spots:
+                            if spot != self.starting_spot and spot != self.target:
+                                spot.barrier = False
+                                spot.draw(self.black)
+                        if self.starting_spot:
+                            self.starting_spot.draw(self.gold)
+                        if self.target:
+                            self.target.draw(self.red)
+                    if event.key == pygame.K_a:
+                        if self.target is not None and self.starting_spot is not None:
+                            self.run_algorithm(AStar(manhattan), "A*")
+                    if event.key == pygame.K_d:
+                        if self.target is not None and self.starting_spot is not None:
+                            self.run_algorithm(Dijkstra(), "Dijkstra")
+                    if event.key == pygame.K_f:
+                        if self.target is not None and self.starting_spot is not None:
+                            self.run_algorithm(BFS(), "BFS")
+                    if event.key == pygame.K_i:
+                        if self.target is not None and self.starting_spot is not None:
+                            self.run_algorithm(BidirectionalBFS(), "Bidirectional BFS")
+                elif event.type == pygame.KEYUP:
+                    self.keys_pressed.discard(event.key)
+            
+            # Continuous barrier drawing when 'b' is held
+            if pygame.K_b in self.keys_pressed:
+                pos = pygame.mouse.get_pos()
+                self.draw_barrier(pos[0] // self.square_size, pos[1] // self.square_size)
+            
+            # Draw help text (always on top)
+            self.draw_help_text()
+            pygame.display.flip()
 
-
-def backtrack(spot_to_consider, path, start):
-    spot_found = False
-    spot_to_consider.draw((252, 3, 215))
-    while not spot_found:
-        for neighbor in spot_to_consider.neighbors:
-            if neighbor not in path and neighbor != start and not neighbor.barrier:
-                neighbor.draw(neighbor.white)
-                path.append(neighbor)
-                return neighbor
-        return backtrack(path[path.index(spot_to_consider) - 1], path, start)
-
-
-# Find the best spot closest to target spot
-def consider_spot(spot_to_consider, target, path, start):
-    path.append(spot_to_consider)
-    best_spot = None
-    best_spot_f_cost = None
-
-    # Goes through all the spot(spot_to_consider)'s neighbors
-    for neighbor in spot_to_consider.neighbors:
-        if neighbor == target:  # If the neighbor spot is the target spot return target to end while loop and print target reached
-            print("Target reached!")
-            pygame.display.update()
-            return target, path
-        if not neighbor.barrier and neighbor not in path and neighbor != start:
-            curr_f_cost = abs(neighbor.row - target.row) + abs(neighbor.col - target.col)
-            if best_spot_f_cost is None or curr_f_cost < best_spot_f_cost:
-                best_spot = neighbor
-                best_spot_f_cost = curr_f_cost
-
-    if best_spot is None:
-        return backtrack(spot_to_consider, path, start), path
-    else:
-        best_spot.draw(best_spot.white)
-        path.append(best_spot)
-        return best_spot, path
-
-
-def draw_best_path(path, start):
-    path.reverse()
-    path_color = (56, 228, 174)
-
-    i = 0
-    while i < len(path) - 1:
-        path[i].draw(path_color)
-        pygame.display.update()
-        path.remove(path[i])
-
-        if path[i] == start:
-            break
-
-        best_spot = None
-        best_spot_f_cost = None
-        for neighbor in path[i].neighbors:
-            if neighbor in path:
-                curr_f_cost = abs(neighbor.row - start.row) + abs(neighbor.col - start.col)
-                if best_spot is None or curr_f_cost < best_spot_f_cost:
-                    best_spot = neighbor
-                    best_spot_f_cost = curr_f_cost
-
-        if best_spot is None:
-            i += 1
+    def run_algorithm(self, algorithm, name):
+        # Convert spot coordinates (1-indexed) to grid coordinates (0-indexed)
+        start = (self.starting_spot.row - 1, self.starting_spot.col - 1)
+        goal = (self.target.row - 1, self.target.col - 1)
+        
+        # Build grid from current spots
+        from core.grid import Grid
+        grid = Grid(self.rows, self.columns, diagonal=False)
+        for spot in self.spots:
+            if spot.barrier:
+                # Convert spot coordinates to grid coordinates
+                grid.add_block((spot.row - 1, spot.col - 1))
+        
+        path, metrics = algorithm.search(grid, start, goal)
+        
+        # Clear previous path by redrawing all spots
+        for spot in self.spots:
+            if spot.barrier:
+                spot.draw(self.gray)
+            else:
+                spot.draw(self.black)
+        
+        # Draw explored nodes in blue (excluding start and target)
+        blue = (100, 149, 237)
+        for coord in metrics.explored:
+            row, col = coord
+            spot_row, spot_col = row + 1, col + 1
+            if (spot_row, spot_col) != (self.starting_spot.row, self.starting_spot.col) and (spot_row, spot_col) != (self.target.row, self.target.col):
+                for spot in self.spots:
+                    if spot.row == spot_row and spot.col == spot_col:
+                        spot.draw(blue)
+                        # Draw step number
+                        step = metrics.explored_order.get(coord, "?")
+                        self.draw_number_on_spot(spot, step)
+        
+        # Redraw start and target in original colors
+        self.starting_spot.draw(self.gold)
+        self.target.draw(self.red)
+        
+        if path:
+            # Draw new path (excluding start and target)
+            # Convert grid coordinates back to spot coordinates (add 1)
+            for coord in path:
+                row, col = coord
+                spot_row, spot_col = row + 1, col + 1
+                if (spot_row, spot_col) != (self.starting_spot.row, self.starting_spot.col) and (spot_row, spot_col) != (self.target.row, self.target.col):
+                    for spot in self.spots:
+                        if spot.row == spot_row and spot.col == spot_col:
+                            spot.draw(self.green)
+            print(f"{name}: nodes={metrics.nodes_expanded} path_len={metrics.path_length} time={metrics.runtime_ms:.2f}ms")
         else:
-            i = path.index(best_spot)
+            print(f"{name}: No path found")
 
+    def draw_number_on_spot(self, spot, step):
+        """Draw step number on a spot"""
+        x = spot.col * spot.square_size - spot.square_size // 2
+        y = spot.row * spot.square_size - spot.square_size // 2
+        text_surf = self.font.render(str(step), True, (255, 255, 0))
+        self.screen.blit(text_surf, (x, y))
 
-def path_finding(start, end):
-    path = []
-    spot, path = consider_spot(start, end, path, start)
-    while spot != end:
-        # time.sleep(.1)
-        spot, path = consider_spot(spot, end, path, start)
-        pygame.display.update()
-    draw_best_path(path, start)
-
-
-def calDistance(spot1, spot2):
-    spot1_x = spot1.col
-    spot1_y = spot1.row
-    spot2_x = spot2.col
-    spot2_y = spot2.row
-
-    x_distance = spot1_x - spot2_x
-    y_distance = spot1_y - spot2_y
-
-    return x_distance, y_distance
 
 
 if __name__ == "__main__":
