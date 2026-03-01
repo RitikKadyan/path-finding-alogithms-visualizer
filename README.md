@@ -1,4 +1,4 @@
-# Pathfinding Engine
+# Pathfinding Algorithm Visualizer
 
 This repository contains a modular pathfinding engine in Python designed for
 education, benchmarking, and visualization.
